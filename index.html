@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Triflo Klinik Simülatör - Jet Hızında</title>
+    <style>
+        /* GENEL SAYFA TASARIMI */
+        body {
+            margin: 0;
+            background-color: #1a1a24;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+        #mainContainer {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        /* OYUN ALANI (Dinamik Genişlik Eklendi kanka!) */
+        #gameZone {
+            width: 1000px; /* Varsayılan büyük genişlik */
+            height: 520px;
+            background: linear-gradient(to bottom, #1a2a6c, #b21f1f, #fdbb2d);
+            position: relative;
+            overflow: hidden;
+            border: 4px solid #4e54c8;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: width 0.3s ease; /* Boyut değişiminde tatlı geçiş */
+        }
+        /* Oyun aktifken vitese yer açmak için küçülen durum */
+        #gameZone.game-active {
+            width: 780px;
+        }
+        
+        /* 🐦 DETAYLI SEVİMLİ KUŞ TASARIMI */
+        #bird {
+            width: 38px;
+            height: 30px;
+            background-color: #f1c40f; /* Sarı gövde */
+            border-radius: 18px 18px 12px 12px;
+            position: absolute;
+            left: 60px;
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        /* Kuşun Gözü */
+        #bird::before {
+            content: "";
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            width: 7px;
+            height: 7px;
+            background: #fff;
+            border-radius: 50%;
+        }
+        /* Kuşun Göz Bebeği */
+        #bird::after {
+            content: "";
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            width: 3px;
+            height: 3px;
+            background: #000;
+            border-radius: 50%;
+        }
+        /* Kuşun Gagası ve Kanadı */
+        .bird-parts {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        /* Turuncu Gaga */
+        .bird-beak {
+            position: absolute;
+            top: 10px;
+            right: -8px;
+            width: 10px;
+            height: 8px;
+            background: #e67e22;
+            border-radius: 0 10px 10px 0;
+        }
+        /* Kanat */
+        .bird-wing {
+            position: absolute;
+            top: 10px;
+            left: 5px;
+            width: 14px;
+            height: 10px;
+            background: #f39c12;
+            border-radius: 10px 3px 10px 10px;
+            animation: flap 0.15s infinite alternate;
+            transform-origin: top left;
+        }
+        @keyframes flap {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(-25deg); }
+        }
+
+        /* ENGELLER (BORULAR) */
+        .pipe {
+            width: 65px;
+            background: linear-gradient(90deg, #11998e, #38ef7d);
+            border: 2px solid #fff;
+            position: absolute;
+            border-radius: 4px;
+            z-index: 8;
+        }
+        /* KLİNİK HEDEF ÇİZGİSİ */
+        #targetLine {
+            width: 100%;
+            height: 3px;
+            background-color: #ff0055;
+            position: absolute;
+            z-index: 5;
+            box-shadow: 0 0 10px #ff0055;
+            display: none; 
+        }
+        /* BİLGİ PANELLERİ */
+        .ui-board {
+            position: absolute;
+            padding: 8px 15px;
+            background: rgba(0,0,0,0.75);
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            border: 1px solid #4e54c8;
+            z-index: 20;
+        }
+        #scoreBoard { top: 15px; left: 15px; color: #fff; }
+        #levelBoard { top: 15px; right: 15px; color: #fdbb2d; }
+        #badgeDisplay { top: 60px; right: 15px; color: #00ffcc; font-size: 14px; }
+        
+        /* GİRİŞ/ÇIKIŞ BUTON GRUBU */
+        #btnGroup {
+            position: absolute;
+            top: 110px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
+        }
+        .menu-btn {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .menu-btn:hover {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 15px #00ffcc;
+        }
+        #clinicalPanel {
+            bottom: 15px;
+            left: 15px;
+            width: 280px;
+        }
+        /* SAĞDAKİ VİTES PANELİ (Varsayılan olarak gizli kanka!) */
+        #gearContainer {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            background: #252538;
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #4e54c8;
+            height: 520px;
+            justify-content: space-between;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        #gearContainer.visible {
+            display: flex;
+        }
+        .lever-label { font-size: 14px; font-weight: bold; color: #a0a0c0; text-align: center;}
+        .slider-wrapper {
+            position: relative;
+            height: 300px;
+            display: flex;
+            align-items: center;
+        }
+        /* DİKEY SLIDER (KOL) */
+        .vertical-slider {
+            -webkit-appearance: none;
+            transform: rotate(-90deg);
+            width: 280px;
+            height: 12px;
+            background: #151522;
+            border-radius: 10px;
+            outline: none;
+            border: 1px solid #4e54c8;
+        }
+        .vertical-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: #ff0055;
+            cursor: pointer;
+            border: 3px solid #fff;
+            box-shadow: 0 0 10px rgba(255,0,85,0.8);
+        }
+        .custom-btn {
+            padding: 12px 24px;
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            margin-top: 15px;
+        }
+        .custom-btn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+        
+        /* POPUP MODAL ARKA PLANLARI */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10,10,15,0.95); 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .popup-card {
+            background: rgba(37, 37, 56, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #4e54c8;
+            text-align: center;
+            max-width: 440px;
+        }
+
+        /* PROFİL SEÇİM ANASAYFA MODAL TASARIMI */
+        #profileDashboardModal {
+            z-index: 200;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            padding-top: 40px;
+            box-sizing: border-box;
+        }
+        .dash-header {
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .dash-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ffcc;
+            text-shadow: 0 0 10px rgba(0,255,204,0.4);
+            margin: 0;
+        }
+        /* PROFİL LİSTESİ */
+        .profiles-container {
+            width: 90%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        /* PROFİL KARTLARI */
+        .profile-card {
+            background: #252538;
+            border: 2px solid #4e54c8;
+            border-radius: 12px;
+            width: 140px;
+            padding: 15px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .profile-card:hover {
+            border-color: #00ffcc;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,255,204,0.3);
+        }
+        .profile-avatar {
+            width: 50px;
+            height: 50px;
+            background: #1a2a6c;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: #fff;
+            margin: 0 auto 10px auto;
+            border: 2px solid #4e54c8;
+        }
+        .profile-card:hover .profile-avatar {
+            border-color: #00ffcc;
+            background: #00ffcc;
+            color: #000;
+        }
+        .profile-name {
+            font-weight: bold;
+            font-size: 13px;
+            color: #fff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .profile-stats {
+            font-size: 11px;
+            color: #a0a0c0;
+            margin-top: 5px;
+        }
+
+        /* YENİ PROFİL EKLEME MODALI */
+        #addProfileModal {
+            z-index: 210;
+            display: none;
+        }
+        .input-field {
+            width: 80%;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: 1px solid #4e54c8;
+            background: #151522;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            text-align: center;
+        }
+        .input-field:focus {
+            border-color: #00ffcc;
+            box-shadow: 0 0 10px rgba(0,255,204,0.3);
+        }
+
+        /* DOKTOR GİRİŞİ PANELİ MODAL */
+        #doctorViewModal {
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            padding-top: 20px;
+        }
+        .doctor-container {
+            width: 95%;
+            background: #252538;
+            border: 2px solid #00ffcc;
+            border-radius: 15px;
+            padding: 15px;
+            box-sizing: border-box;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+        }
+        .doctor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #4e54c8;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .patient-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 5px;
+        }
+        .patient-row {
+            background: #1a1a24;
+            border: 1px solid #4e54c8;
+            border-radius: 8px;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: 0.2s;
+        }
+        .patient-row:hover {
+            border-color: #00ffcc;
+            background: rgba(0,255,204,0.05);
+        }
+
+        /* GELİŞTİRME EKRANI */
+        #upgradeScreen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #180f33 0%, #07040d 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 110;
+            text-align: center;
+        }
+        .upgrade-title {
+            font-size: 56px;
+            font-weight: 900;
+            color: #ff0055;
+            text-shadow: 0 0 20px #ff0055;
+            letter-spacing: 10px;
+            margin: 0;
+            animation: superGlow 1.2s infinite alternate;
+        }
+        @keyframes superGlow {
+            from { transform: scale(0.96); }
+            to { transform: scale(1.04); }
+        }
+        .upgrade-subtitle {
+            font-size: 16px;
+            color: #00ffcc;
+            margin-top: 12px;
+            font-weight: bold;
+        }
+        /* GRAFİK MODAL PANELİ */
+        #chartModal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 15, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 310;
+        }
+        #chartBox {
+            background: #252538;
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid #4e54c8;
+            box-sizing: border-box;
+            width: 550px;
+        }
+        .graph-container {
+            display: flex;
+            align-items: flex-end;
+            height: 180px;
+            gap: 25px;
+            border-left: 2px solid #4e54c8;
+            border-bottom: 2px solid #4e54c8;
+            padding-left: 15px;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        .graph-bar {
+            width: 55px;
+            background: linear-gradient(to top, #4e54c8, #00ffcc);
+            border-radius: 4px 4px 0 0;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            position: relative;
+        }
+        .graph-bar span { position: absolute; top: -20px; left: 0; width: 100%; }
+        .graph-label { font-size: 11px; color: #a0a0c0; margin-top: 5px; text-align: center; width: 55px;}
+    </style>
+</head>
+<body>
+
+<div id="mainContainer">
+    <div id="gameZone">
+        
+        <!-- PROFİL ANASAYFASI -->
+        <div id="profileDashboardModal" class="modal-overlay">
+            <div class="dash-header">
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="menu-btn" style="border-color:#ff0055; color:#ff0055; padding: 10px 18px; font-size: 13px;" onclick="promptDoctorLogin()">🩺 Doktor Paneli</button>
+                    <h1 class="dash-title">🎮 Kim Oynuyor?</h1>
+                </div>
+                <div style="display:flex; gap: 8px;">
+                    <button class="menu-btn" style="border-color:#fdbb2d; color:#fdbb2d; padding: 10px 18px; font-size: 13px;" onclick="fetchFromCloud()">🔄 Yenile</button>
+                    <button class="menu-btn" style="padding: 10px 18px; font-size: 13px;" onclick="openAddProfileModal()">➕ Profil Ekle</button>
+                </div>
+            </div>
+            
+            <div class="profiles-container" id="profilesContainer">
+                <div style="color: #a0a0c0; font-size: 14px; text-align: center; margin-top: 40px;">Veriler yükleniyor...</div>
+            </div>
+        </div>
+
+        <!-- PROFİL EKLEME POPUP EKRANI -->
+        <div id="addProfileModal" class="modal-overlay">
+            <div class="popup-card">
+                <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">👤 Yeni Profil Oluştur</h2>
+                <p style="font-size: 13px; color: #a0a0c0; margin-bottom: 15px;">Klinik verilerini kaydetmek için adını ve soyadını gir.</p>
+                <input type="text" id="newNameInput" class="input-field" placeholder="Adı" required>
+                <input type="text" id="newSurnameInput" class="input-field" placeholder="Soyadı" required>
+                <br>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                    <button class="menu-btn" style="border-color:#ff0055; color:#ff0055; padding: 10px 20px;" onclick="closeAddProfileModal()">Vazgeç</button>
+                    <button class="menu-btn" style="padding: 10px 20px;" onclick="createNewProfile()">Kaydet ve Ekle ✔️</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOKTOR PANELİ MODAL -->
+        <div id="doctorViewModal" class="modal-overlay">
+            <div class="doctor-container">
+                <div class="doctor-header">
+                    <h2 style="color: #00ffcc; margin:0; font-size: 20px;">🩺 Doktor Klinik İzleme Merkezi</h2>
+                    <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="closeDoctorPanel()">Paneli Kapat ❌</button>
+                </div>
+                <div style="margin-bottom:15px; font-size:13px; color:#a0a0c0; text-align:left;">
+                    Bulut veritabanından alınan canlı hasta listesi ve son seans verileri aşağıda listelenmiştir.
+                </div>
+                <div class="patient-list" id="patientListContainer">
+                    <!-- Hastalar buluttan çekilerek buraya eklenecek -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Başlangıç Analiz Ekranı -->
+        <div id="overlay" class="modal-overlay" style="display: none;">
+            <div class="popup-card">
+                <div id="activeUserBadge" style="font-size: 12px; color: #00ffcc; background: rgba(0,255,204,0.1); padding: 5px 10px; border-radius: 15px; display: inline-block; margin-bottom: 10px; font-weight: bold;"></div>
+                
+                <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">🔬 Başlangıç Aşaması (Solunum Analizi)</h2>
+                <p style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;">Vites kolunu yukarı kaldırarak ciğer performansınızı ölçün.</p>
+                <p style="font-size: 12px; color: #ff0055; font-weight: bold; margin: 0;" id="alertTxt">⚠️ Lütfen önce kolu yukarı hareket ettirerek üfleme yapın!</p>
+                
+                <div style="display: flex; gap: 10px; margin: 15px 0;">
+                    <div style="flex: 1; font-size: 14px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                        Anlık Kol: <span id="calibValTxt" style="color:#00ffcc; font-weight:bold;">%0</span>
+                    </div>
+                    <div style="flex: 1; font-size: 14px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid #ff0055;">
+                        En Yüksek Güç: <span id="peakValTxt" style="color:#ff0055; font-weight:bold;">%0</span>
+                    </div>
+                </div>
+                
+                <button class="custom-btn" id="confirmBtn" onclick="showUpgradeScreen()" disabled>Seviyeyi Ölç ve Onayla</button>
+            </div>
+        </div>
+
+        <!-- Geliştirme Ekranı -->
+        <div id="upgradeScreen">
+            <h1 class="upgrade-title">GELİŞTİRME</h1>
+            <p class="upgrade-subtitle">Sütunlar ölçülen maksimum seviyenizin bir tık yukarısına taşınıyor!</p>
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid #4e54c8; margin: 20px 0; width: 340px;">
+                <div style="color: #a0a0c0; font-size: 14px;">Ölçülen Maksimum Güç: <span id="upgMeasured" style="color:#fff; font-weight:bold; font-size: 16px;">%0</span></div>
+                <div style="color: #00ffcc; font-size: 18px; font-weight: bold; margin-top: 8px;">Taşınan Sütun Seviyesi (+5): <span id="upgTarget" style="color:#ff0055; font-size: 20px;">%5</span></div>
+            </div>
+            <button class="custom-btn" style="background: #00ffcc; color: #000; font-size: 16px; padding: 14px 28px;" onclick="startFirstStage()">1. AŞAMAYI BAŞLAT!</button>
+        </div>
+
+        <!-- Grafik Açılır Penceresi -->
+        <div id="chartModal">
+            <div id="chartBox">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #4e54c8; padding-bottom:10px;">
+                    <span id="chartTitle" style="font-size: 14px; font-weight: bold; color: #00ffcc;">📈 SEANS ACİL CİĞER KAPASİTE GELİŞİM GRAFİĞİ</span>
+                    <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="toggleChart(false)">Kapat ❌</button>
+                </div>
+                <div class="graph-container" id="graphContainer"></div>
+                <div style="margin-top:15px; font-size:12px; color:#a0a0c0; text-align:center;">
+                    Tamamlanan her başarılı seans sonrası hedef limit gelişiminiz burada listelenir.
+                </div>
+            </div>
+        </div>
+
+        <!-- Skor ve Durum Panelleri -->
+        <div id="scoreBoard" class="ui-board">Skor: 0 / 3</div>
+        <div id="levelBoard" class="ui-board">Aşama: Başlangıç (Sütunsuz)</div>
+        <div id="badgeDisplay" class="ui-board">🏆 Kazanılan Rozet: Yok</div>
+        
+        <div id="btnGroup">
+            <button class="menu-btn" onclick="toggleChart(true)">📊 Gelişim Grafiği</button>
+            <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="logoutUser()">👤 Profilleri Aç</button>
+        </div>
+        
+        <div id="clinicalPanel" class="ui-board">
+            <div style="color: #a0a0c0; font-size: 12px;">KLİNİK SENSÖR VERİLERİ</div>
+            <div style="margin-top:4px;">Anlık Üfleme (Kol): <span id="liveFlowTxt" style="color:#ff0055;">%0</span></div>
+            <div>Klinik Hedef (+5): <span id="targetFlowTxt" style="color:#00ffcc;">Ölçülüyor...</span></div>
+        </div>
+
+        <!-- 🐦 KUŞ YAPISI (GÖVDE VE İÇ PARÇALAR) -->
+        <div id="bird">
+            <div class="bird-parts">
+                <div class="bird-beak"></div>
+                <div class="bird-wing"></div>
+            </div>
+        </div>
+        <div id="targetLine"></div>
+    </div>
+
+    <!-- Vites Kolu Alanı -->
+    <div id="gearContainer">
+        <div class="lever-label">💨 HAVA AKIŞ<br>VİTES KOLU</div>
+        <div class="slider-wrapper">
+            <input type="range" min="0" max="100" value="0" class="vertical-slider" id="leverSlider">
+        </div>
+        <div id="leverVal" style="font-size: 20px; font-weight: bold; color: #00ffcc;">%0</div>
+    </div>
+</div>
+
+<script>
+    // ELEMENT TANIMLAMALARI
+    const gameZone = document.getElementById('gameZone');
+    const bird = document.getElementById('bird');
+    const targetLine = document.getElementById('targetLine');
+    const scoreEl = document.getElementById('scoreBoard');
+    const levelEl = document.getElementById('levelBoard');
+    const badgeEl = document.getElementById('badgeDisplay');
+    const overlay = document.getElementById('overlay');
+    const upgradeScreen = document.getElementById('upgradeScreen');
+    const chartModal = document.getElementById('chartModal');
+    const upgMeasured = document.getElementById('upgMeasured');
+    const upgTarget = document.getElementById('upgTarget');
+    const calibValTxt = document.getElementById('calibValTxt');
+    const peakValTxt = document.getElementById('peakValTxt');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const alertTxt = document.getElementById('alertTxt');
+    const leverSlider = document.getElementById('leverSlider');
+    const liveFlowTxt = document.getElementById('liveFlowTxt');
+    const targetFlowTxt = document.getElementById('targetFlowTxt');
+    const leverVal = document.getElementById('leverVal');
+    const graphContainer = document.getElementById('graphContainer');
+
+    // PROFİL VE BULUT ELEMANLARI
+    const profileDashboardModal = document.getElementById('profileDashboardModal');
+    const profilesContainer = document.getElementById('profilesContainer');
+    const addProfileModal = document.getElementById('addProfileModal');
+    const newNameInput = document.getElementById('newNameInput');
+    const newSurnameInput = document.getElementById('newSurnameInput');
+    const activeUserBadge = document.getElementById('activeUserBadge');
+    const chartTitle = document.getElementById('chartTitle');
+    const doctorViewModal = document.getElementById('doctorViewModal');
+    const patientListContainer = document.getElementById('patientListContainer');
+    const gearContainer = document.getElementById('gearContainer');
+
+    // OYUN İÇİ DEĞİŞKENLER
+    let birdY = 468;             
+    let score = 0;               
+    let currentStage = 0;        
+    let isAnalysisMode = true;   
+    let gameOver = false;        
+    let isPlaying = false;       
+    let pipes = [];              
+    let pipeSpawnTimer = 0;      
+    let highestMeasured = 0;     
+    let clinicalTarget = 0;      
+    let currentFlow = 0;         
+
+    // SEÇİLİ PROFİL VE SEANS VERİSİ
+    let currentUserKey = "";      
+    let sessionHistory = [];     
+    let bulutProfilleri = {}; 
+
+    const stageGaps = [200, 150, 110]; 
+    const stageNames = ["1. Aşama: Geniş Aralık", "2. Aşama: Orta Aralık", "3. Aşama: Dar Aralık"];
+    const stageBadges = ["🥉 Bronz Solunum Rozeti", "🥈 Gümüş Akciğer Rozeti", "🥇 Altın Güç Rozeti"];
+
+    // ==========================================
+    // ⚡ BULUT VE YEREL DEPOLAMA ENTEGRASYONU
+    // ==========================================
+    const cloudURL = "https://triflo-game-default-rtdb.europe-west1.firebasedatabase.app/hastalar.json";
+
+    function fetchFromCloud() {
+        profilesContainer.innerHTML = `<div style="color: #00ffcc; font-size: 14px; text-align: center; margin-top: 40px; width:100%;">Yükleniyor... ⚡</div>`;
+        let localBackup = JSON.parse(localStorage.getItem('triflo_local_hastalar')) || {};
+        
+        fetch(cloudURL)
+        .then(response => {
+            if(!response.ok) throw new Error("Bağlantı Hatası");
+            return response.json();
+        })
+        .then(data => {
+            bulutProfilleri = { ...localBackup, ...data };
+            localStorage.setItem('triflo_local_hastalar', JSON.stringify(bulutProfilleri));
+            renderProfilesDashboard();
+            renderDoctorPanel();
+        })
+        .catch(err => {
+            console.warn("Bulut bağlantısı kurulamadı, yerel hafızadan yükleniyor:", err);
+            bulutProfilleri = localBackup;
+            renderProfilesDashboard();
+            renderDoctorPanel();
+        });
+    }
+
+    window.onload = function() {
+        fetchFromCloud(); 
+    };
+
+    function renderProfilesDashboard() {
+        profilesContainer.innerHTML = '';
+        let keys = Object.keys(bulutProfilleri);
+        let validKeys = keys.filter(key => {
+            let p = bulutProfilleri[key];
+            return p && typeof p === 'object' && p.name && p.surname;
+        });
+
+        if (validKeys.length === 0) {
+            profilesContainer.innerHTML = `
+                <div style="color: #a0a0c0; font-size: 14px; text-align: center; margin-top: 40px; width:100%;">
+                    Kayıtlı profil bulunamadı.<br>Sağ üstteki <b>"Profil Ekle"</b> butonuna basarak hemen ilk profilini oluştur kanka!
+                </div>
+            `;
+            return;
+        }
+
+        validKeys.forEach(function(key) {
+            let pData = bulutProfilleri[key];
+            let nameVal = pData.name || "İsimsiz";
+            let surnameVal = pData.surname || "";
+            let firstLetter = nameVal.charAt(0).toUpperCase();
+            let seansCount = pData.history ? pData.history.length : 0;
+
+            let card = document.createElement('div');
+            card.className = 'profile-card';
+            card.onclick = function() { selectProfile(key); };
+
+            card.innerHTML = `
+                <div class="profile-avatar">${firstLetter}</div>
+                <div class="profile-name" title="${nameVal} ${surnameVal}">${nameVal} ${surnameVal}</div>
+                <div class="profile-stats">Seans: ${seansCount}</div>
+            `;
+            profilesContainer.appendChild(card);
+        });
+    }
+
+    function openAddProfileModal() {
+        newNameInput.value = "";
+        newSurnameInput.value = "";
+        addProfileModal.style.display = 'flex';
+    }
+
+    function closeAddProfileModal() {
+        addProfileModal.style.display = 'none';
+    }
+
+    function createNewProfile() {
+        let name = newNameInput.value.trim();
+        let surname = newSurnameInput.value.trim();
+
+        if (name === "" || surname === "" || name.toLowerCase() === "undefined" || surname.toLowerCase() === "undefined") {
+            alert("Lütfen geçerli bir Ad ve Soyad girin kanka!");
+            return;
+        }
+
+        let cleanKey = (surname + "_" + name).toLowerCase().replace(/[^a-z0-9]/g, '') + "_" + Date.now();
+        let newProfileObj = {
+            name: name,
+            surname: surname,
+            history: []
+        };
+
+        let localData = JSON.parse(localStorage.getItem('triflo_local_hastalar')) || {};
+        localData[cleanKey] = newProfileObj;
+        localStorage.setItem('triflo_local_hastalar', JSON.stringify(localData));
+
+        fetch(`https://triflo-game-default-rtdb.europe-west1.firebasedatabase.app/hastalar/${cleanKey}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newProfileObj)
+        })
+        .then(() => {
+            closeAddProfileModal();
+            fetchFromCloud(); 
+        })
+        .catch(err => {
+            console.warn("Bulut kaydı başarısız oldu ancak yerel hafızaya kaydedildi.");
+            closeAddProfileModal();
+            bulutProfilleri = localData; 
+            renderProfilesDashboard();
+        });
+    }
+
+    // PROFİL SEÇİLDİĞİNDE OYUN ALANINI DARALT VE VİTES KOLUNU GÖSTER
+    function selectProfile(userKey) {
+        currentUserKey = userKey;
+        let pData = bulutProfilleri[userKey];
+
+        if (pData && pData.name) {
+            sessionHistory = pData.history || [];
+            let nameVal = pData.name ? pData.name.toUpperCase() : "İSİMSİZ";
+            let surnameVal = pData.surname ? pData.surname.toUpperCase() : "";
+            let fullName = nameVal + " " + surnameVal;
+            
+            activeUserBadge.innerText = "👤 Oyuncu: " + fullName;
+            chartTitle.innerText = `📈 ${fullName} - GELİŞİM GRAFİĞİ`;
+
+            // Ekranı oyuna hazırla
+            gearContainer.classList.add('visible');
+            gameZone.classList.add('game-active');
+
+            profileDashboardModal.style.display = 'none';
+            overlay.style.display = 'flex';
+
+            updateClinicChart();
+            isPlaying = true;
+            requestAnimationFrame(gameLoop);
+        } else {
+            alert("Bu profil bozuk olduğu için açılamadı kanka!");
+        }
+    }
+
+    function saveCurrentUserData() {
+        if (!currentUserKey) return;
+        
+        let localData = JSON.parse(localStorage.getItem('triflo_local_hastalar')) || {};
+        if (localData[currentUserKey]) {
+            localData[currentUserKey].history = sessionHistory;
+            localStorage.setItem('triflo_local_hastalar', JSON.stringify(localData));
+        }
+
+        fetch(`https://triflo-game-default-rtdb.europe-west1.firebasedatabase.app/hastalar/${currentUserKey}/history.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sessionHistory)
+        })
+        .then(() => {
+            fetchFromCloud(); 
+        })
+        .catch(err => {
+            console.warn("Geçmiş verisi buluta gönderilemedi ancak yerel hafızaya kaydedildi.");
+            bulutProfilleri = localData;
+            renderProfilesDashboard();
+        });
+    }
+
+    // ÇIKIŞ YAPILDIĞINDA EKRANI TEKRAR BÜYÜT VE VİTES KOLUNU GİZLE
+    function logoutUser() {
+        let confirmLogout = confirm("Profil ekranına geri dönmek istiyor musunuz?");
+        if (!confirmLogout) return;
+
+        isPlaying = false; 
+        
+        // Ekranı normal genişliğe getir
+        gearContainer.classList.remove('visible');
+        gameZone.classList.remove('game-active');
+
+        profileDashboardModal.style.display = 'flex';
+        overlay.style.display = 'none';
+        upgradeScreen.style.display = 'none';
+        chartModal.style.display = 'none';
+        targetLine.style.display = 'none';
+        
+        returnToCalibration();
+    }
+
+    // ==========================================
+    // 🩺 DOKTOR PANELİ (VİTES KOLU GİZLENDİ, BÜYÜTÜLDÜ)
+    // ==========================================
+    function promptDoctorLogin() {
+        let password = prompt("Lütfen Doktor Şifresini Giriniz:");
+        if (password === "1234") {
+            // Doktor panelini açarken vitesi gizle ve ekranı tam genişlik yap
+            gearContainer.classList.remove('visible');
+            gameZone.classList.remove('game-active');
+            doctorViewModal.style.display = 'flex';
+        } else if (password !== null) {
+            alert("Hatalı şifre girdin kanka!");
+        }
+    }
+
+    function closeDoctorPanel() {
+        doctorViewModal.style.display = 'none';
+        // Eğer bir oyuncu seansı aktif değilse vites kolu gizli ve ekran geniş kalmaya devam etsin
+        if (isAnalysisMode && !currentUserKey) {
+            gearContainer.classList.remove('visible');
+            gameZone.classList.remove('game-active');
+        }
+    }
+
+    function renderDoctorPanel() {
+        patientListContainer.innerHTML = '';
+        let keys = Object.keys(bulutProfilleri);
+        let validKeys = keys.filter(key => {
+            let p = bulutProfilleri[key];
+            return p && typeof p === 'object' && p.name;
+        });
+
+        if (validKeys.length === 0) {
+            patientListContainer.innerHTML = `<div style="text-align:center; color:#a0a0c0;">Henüz kayıtlı hasta verisi bulunamadı.</div>`;
+            return;
+        }
+
+        validKeys.forEach(function(key) {
+            let pData = bulutProfilleri[key];
+            let hist = pData.history || [];
+            let lastSeans = hist.length > 0 ? "%" + hist[hist.length - 1] : "Veri yok";
+            let totalSeans = hist.length;
+
+            let row = document.createElement('div');
+            row.className = 'patient-row';
+            row.innerHTML = `
+                <div>
+                    <strong style="color:#00ffcc; font-size:15px;">${pData.name} ${pData.surname || ""}</strong>
+                    <div style="font-size:12px; color:#a0a0c0; margin-top:2px;">Seans Sayısı: ${totalSeans}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size:12px; color:#ff0055; font-weight:bold;">Son Seans Hedefi: ${lastSeans}</div>
+                    <button class="menu-btn" style="padding: 4px 10px; font-size:11px; margin-top:5px;" onclick="viewPatientHistory('${key}')">Tarihçe Grafiği 📊</button>
+                </div>
+            `;
+            patientListContainer.appendChild(row);
+        });
+    }
+
+    function viewPatientHistory(patientKey) {
+        let pData = bulutProfilleri[patientKey];
+        if (pData) {
+            sessionHistory = pData.history || [];
+            let fullName = pData.name.toUpperCase() + " " + (pData.surname ? pData.surname.toUpperCase() : "");
+            chartTitle.innerText = `📈 ${fullName} - GELİŞİM GRAFİĞİ (DOKTOR GÖRÜNÜMÜ)`;
+            updateClinicChart();
+            chartModal.style.display = 'flex';
+        }
+    }
+
+    // ==========================================
+    // OYUN FİZİĞİ VE MATEMATİKSEL İŞLEMLER
+    // ==========================================
+    function convertPercentageToPixelY(percentage) {
+        return 500 - (percentage * 5); 
+    }
+
+    birdY = convertPercentageToPixelY(0);
+    bird.style.top = birdY + 'px';
+
+    leverSlider.addEventListener('input', function(e) {
+        currentFlow = parseInt(e.target.value);
+        leverVal.innerText = "%" + currentFlow;
+        liveFlowTxt.innerText = "%" + currentFlow;
+        
+        if (isAnalysisMode) {
+            calibValTxt.innerText = "%" + currentFlow;
+            if (currentFlow > highestMeasured) {
+                highestMeasured = currentFlow;
+                peakValTxt.innerText = "%" + highestMeasured;
+            }
+            if (highestMeasured > 0) {
+                confirmBtn.disabled = false;
+                alertTxt.style.color = "#00ffcc";
+                alertTxt.innerText = "✅ Başarıyla ölçüldü! Onaylayıp ilerleyebilirsiniz.";
+            }
+        }
+    });
+
+    function showUpgradeScreen() {
+        if (highestMeasured === 0) return; 
+
+        clinicalTarget = highestMeasured + 5; 
+        if(clinicalTarget > 100) clinicalTarget = 100;
+
+        upgMeasured.innerText = "%" + highestMeasured;
+        upgTarget.innerText = "%" + clinicalTarget;
+
+        overlay.style.display = 'none';
+        upgradeScreen.style.display = 'flex'; 
+    }
+
+    function startFirstStage() {
+        upgradeScreen.style.display = 'none';
+        
+        targetFlowTxt.innerText = "%" + clinicalTarget;
+        let targetPixelY = convertPercentageToPixelY(clinicalTarget);
+        targetLine.style.top = targetPixelY + 'px'; 
+        targetLine.style.display = 'block'; 
+        
+        isAnalysisMode = false; 
+        currentStage = 1; 
+        
+        resetGameMetrics();
+    }
+
+    function clearAllPipes() {
+        const existingPipes = document.querySelectorAll('.pipe');
+        existingPipes.forEach(function(el) { el.remove(); });
+        pipes = [];
+    }
+
+    function resetGameMetrics() {
+        clearAllPipes();
+        birdY = convertPercentageToPixelY(currentFlow);
+        score = 0;
+        pipeSpawnTimer = 0;
+        gameOver = false;
+        scoreEl.innerText = "Skor: 0 / 3";
+        levelEl.innerText = isAnalysisMode ? "Aşama: Başlangıç (Sütunsuz)" : stageNames[currentStage - 1];
+    }
+
+    // ==========================================
+    // ⚙️ FİZİK MOTORU (Süzülme & Dengeli İniş/Çıkış)
+    // ==========================================
+    function gameLoop() {
+        if (!isPlaying || gameOver) return;
+
+        let hedefY = convertPercentageToPixelY(currentFlow);
+        
+        // Vites sıfıra veya altına düştüğünde yavaş süzülme, yükselirken hızlı reaksiyon
+        let yumusaklik = (hedefY > birdY) ? 0.03 : 0.08; 
+        birdY = birdY + (hedefY - birdY) * yumusaklik; 
+
+        // Ekstra tatlı yerçekimi payı
+        birdY = birdY + 0.4; 
+
+        if (birdY < 0) birdY = 0;
+        if (birdY > 470) birdY = 470;
+        bird.style.top = birdY + 'px';
+
+        if (!isAnalysisMode) {
+            pipeSpawnTimer += 1;
+            if (pipeSpawnTimer >= 150) { 
+                createClinicalPipe();
+                pipeSpawnTimer = 0;
+            }
+            updatePipes();
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function createClinicalPipe() {
+        if (isAnalysisMode) return; 
+
+        let gap = stageGaps[currentStage - 1]; 
+        let targetPixelY = convertPercentageToPixelY(clinicalTarget); 
+        
+        let topHeight = targetPixelY - (gap / 2);
+        let bottomTop = targetPixelY + (gap / 2);
+        
+        if(topHeight < 20) {
+            topHeight = 20;
+            bottomTop = topHeight + gap;
+        }
+        if(bottomTop > 480) {
+            bottomTop = 480;
+            topHeight = bottomTop - gap;
+        }
+        
+        let bottomHeight = 500 - bottomTop;
+
+        // Dinamik sağ başlangıç noktası (gameZone genişliğine göre)
+        let spawnX = gameZone.clientWidth;
+
+        let topPipe = document.createElement('div');
+        topPipe.className = 'pipe';
+        topPipe.style.height = topHeight + 'px';
+        topPipe.style.top = '0px';
+        topPipe.style.left = spawnX + 'px';
+
+        let bottomPipe = document.createElement('div');
+        bottomPipe.className = 'pipe';
+        bottomPipe.style.height = bottomHeight + 'px';
+        bottomPipe.style.top = bottomTop + 'px';
+        bottomPipe.style.left = spawnX + 'px';
+
+        gameZone.appendChild(topPipe);
+        gameZone.appendChild(bottomPipe);
+
+        pipes.push({ topEl: topPipe, bottomEl: bottomPipe, left: spawnX, passed: false });
+    }
+
+    function updatePipes() {
+        if (isAnalysisMode) return;
+
+        let moveSpeed = 2.2; 
+
+        for (let i = pipes.length - 1; i >= 0; i--) {
+            let p = pipes[i];
+            p.left -= moveSpeed;
+            p.topEl.style.left = p.left + 'px';
+            p.bottomEl.style.left = p.left + 'px';
+
+            if (!p.passed && p.left < 60) {
+                p.passed = true;
+                score++;
+                scoreEl.innerText = "Skor: " + score + " / 3";
+
+                if (score >= 3) { 
+                    advanceStage();
+                    return;
+                }
+            }
+
+            if (checkCollision(p)) {
+                gameOver = true;
+                triggerGameOver();
+                return;
+            }
+
+            if (p.left < -70) {
+                p.topEl.remove();
+                p.bottomEl.remove();
+                pipes.splice(i, 1);
+            }
+        }
+    }
+
+    function checkCollision(p) {
+        let birdRect = { left: 60, right: 98, top: birdY, bottom: birdY + 30 };
+        let topPipeBottom = parseFloat(p.topEl.style.height);
+        let bottomPipeTop = 500 - parseFloat(p.bottomEl.style.height);
+
+        if (birdRect.right > p.left && birdRect.left < p.left + 65) {
+            if (birdRect.top < topPipeBottom || birdRect.bottom > bottomPipeTop) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function advanceStage() {
+        badgeEl.innerText = "🏆 Kazanılan Rozet: " + stageBadges[currentStage - 1];
+        
+        if (currentStage < 3) {
+            currentStage++;
+            alert("MÜKEMMEL! " + stageBadges[currentStage - 2] + " Kazanıldı!\nZorluk artıyor, sonraki aşama başlıyor kanka!");
+            resetGameMetrics();
+        } else {
+            sessionHistory.push(clinicalTarget); 
+            saveCurrentUserData();                
+            updateClinicChart();                 
+            
+            alert("TEBRİKLER! Seansı başarıyla tamamladın kanka. İlerlemen başarıyla kaydedildi!");
+            toggleChart(true); 
+            returnToCalibration();
+        }
+    }
+
+    function returnToCalibration() {
+        isAnalysisMode = true; 
+        currentStage = 0; 
+        highestMeasured = 0; 
+        targetLine.style.display = 'none';
+        levelEl.innerText = "Aşama: Başlangıç (Sütunsuz)";
+        targetFlowTxt.innerText = "Ölçülüyor...";
+        badgeEl.innerText = "🏆 Kazanılan Rozet: Yok";
+        
+        confirmBtn.disabled = true;
+        alertTxt.style.color = "#ff0055";
+        alertTxt.innerText = "⚠️ Lütfen önce kolu yukarı hareket ettirerek üfleme yapın!";
+        peakValTxt.innerText = "%0";
+        calibValTxt.innerText = "%" + currentFlow;
+
+        // Kalibrasyonda vites görünür, alan dar olur
+        if (currentUserKey) {
+            gearContainer.classList.add('visible');
+            gameZone.classList.add('game-active');
+        }
+
+        clearAllPipes();
+        overlay.style.display = 'flex';
+        upgradeScreen.style.display = 'none';
+        resetGameMetrics();
+    }
+
+    function toggleChart(show) {
+        if (show) {
+            chartModal.style.display = 'flex';
+            isPlaying = false; 
+        } else {
+            chartModal.style.display = 'none';
+            if (!isAnalysisMode) {
+                isPlaying = true;
+                requestAnimationFrame(gameLoop); 
+            }
+        }
+    }
+
+    function updateClinicChart() {
+        graphContainer.innerHTML = ''; 
+        sessionHistory.forEach(function(val, index) {
+            if (val === undefined || val === null) return;
+            
+            let block = document.createElement('div');
+            block.style.display = 'flex';
+            block.style.flexDirection = 'column';
+            block.style.alignItems = 'center';
+
+            let bar = document.createElement('div');
+            bar.className = 'graph-bar';
+            bar.style.height = (val * 1.5) + 'px'; 
+            bar.innerHTML = `<span>%${val}</span>`;
+
+            let label = document.createElement('div');
+            label.className = 'graph-label';
+            label.innerText = (index + 1) + ". Seans";
+
+            block.appendChild(bar);
+            block.appendChild(label);
+            graphContainer.appendChild(block);
+        });
+    }
+
+    function triggerGameOver() {
+        alert("Oyun Bitti! Yeniden kalibre olup başlamak için ekrana dönülüyor kanka.");
+        returnToCalibration();
+    }
+</script>
+
+</body>
+</html>

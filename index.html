@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Triflo Klinik Simülasyonu - Biyomedikal Teknoloji</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="fixedNavHeader">
+        <div class="nav-brand">🫁 TRIFLO BİYO-SİSTEM</div>
+    <div style="display:flex; align-items:center; gap:15px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button class="menu-btn" onclick="scrollToSection('visionSection')">✨ Vizyon</button>
+            <button class="menu-btn" onclick="scrollToSection('techSection')">⚙ Donanım & Model</button>
+            <button class="menu-btn" onclick="scrollToSection('reviewsSection')">💬 Yorumlar</button>
+        </div>
+        <button class="menu-btn" onclick="connectToArduinoSerial()">🔌 Arduino'ya Bağlan</button>
+        <button class="custom-btn" style="margin-top:0; padding: 6px 14px; font-size: 13px;" onclick="openRoleSelectionModal()">Giriş Yap 🚀</button>
+    </div>
+</div>
+
+
+<!-- 1. ROL SEÇİM MODALI -->
+<div id="roleSelectModal" class="modal-overlay" style="display: none; z-index: 300;">
+    <div class="popup-card" style="width: 380px;">
+        <h3 style="color: #00ffcc; margin-top: 0; margin-bottom: 10px;">🏥 Sistem Girişi</h3>
+        <p style="color: #a0a0c0; font-size: 13px; margin-bottom: 20px;">Lütfen sisteme giriş rolünüzü seçin:</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button class="custom-btn" onclick="selectSystemRole('patient')" style="width: 100%; margin: 0; background: #00ffcc; color: #000;">
+                🫁 Ben Hastayım (Giriş)
+            </button>
+            <button class="custom-btn" onclick="selectSystemRole('doctor')" style="width: 100%; margin: 0; background: #4e54c8; color: #fff; border: 1px solid #00ffcc;">
+                🩺 Ben Doktorum (Klinik Panel)
+            </button>
+            <button class="custom-btn" onclick="closeRoleSelectionModal()" style="width: 100%; margin: 0; background: #ff0055; color: #fff;">
+                Vazgeç ❌
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 2. HASTA GİRİŞ MODALI -->
+<div id="directLoginModal" class="modal-overlay" style="display:none; z-index: 250;">
+    <div class="popup-card" style="width: 340px;">
+        <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">👤 Hasta Girişi</h2>
+        <p style="font-size: 13px; color: #a0a0c0; margin-bottom: 15px;">Bilgilerini girerek hesabına bağlan.</p>
+        <input type="text" id="loginNameInput" class="input-field" placeholder="Adın" required>
+        <input type="text" id="loginSurnameInput" class="input-field" placeholder="Soyadın" required>
+        <input type="password" id="loginPasswordInput" class="input-field" placeholder="Şifre" autocomplete="current-password">
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+            <button class="custom-btn" style="margin-top:0; width:100%; background: #00ffcc; color: #0f172a;" onclick="verifyAndLoginPatient()">Giriş Yap ✔️</button>
+            <button class="menu-btn" style="width: 100%; border-color: #ff0055; color: #ff0055; padding: 10px;" onclick="closeDirectLoginModal()">Vazgeç 🔙</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. DOKTOR GÜVENLİK ŞİFRE MODALI -->
+<div id="doctorLoginModal" class="modal-overlay" style="display:none; z-index: 350;">
+    <div class="popup-card" style="width: 340px;">
+        <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">🩺 Doktor Doğrulama</h2>
+        <p style="font-size: 13px; color: #a0a0c0; margin-bottom: 15px;">Klinik panele erişmek için doktor şifresini girin.</p>
+        <input type="password" id="doctorPasswordInput" class="input-field" placeholder="Doktor Şifresi (Örn:....)" autocomplete="current-password">
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+            <button class="custom-btn" style="margin-top:0; width:100%; background: #4e54c8; color: #fff; border: 1px solid #00ffcc;" onclick="verifyAndOpenDoctorPanel()">Doğrula ve Gir 🔓</button>
+            <button class="menu-btn" style="width: 100%; border-color: #ff0055; color: #ff0055; padding: 10px;" onclick="closeDoctorLoginModal()">Vazgeç 🔙</button>
+        </div>
+    </div>
+</div>
+
+<!-- 1. BÖLÜM: HERO / KARŞILAMA VE OYUN ALANI -->
+<section id="heroSection" class="page-section" style="position: relative;">
+    
+    <!-- İLK AÇILIŞ KARŞILAMA EKRANI -->
+    <div id="welcomeBanner" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; width: 100%; height: 100%; padding: 40px; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); border-radius: 12px; box-sizing: border-box;">
+        <div style="font-size: 48px; margin-bottom: 15px;">🫁⚡</div>
+        <h1 style="color: #00ffcc; font-size: 26px; margin-bottom: 10px;">Triflo Akıllı Solunum Platformuna Hoş Geldiniz</h1>
+        <p style="color: #a0a0c0; font-size: 14px; max-width: 600px; line-height: 1.5; margin-bottom: 25px;">
+            Solunum rehabilitasyonu ve gamifiye klinik simülasyon sistemine bağlanmak için girişe tıklayabilirsiniz.
+        </p>
+        <button class="custom-btn" style="background: #00ffcc; color: #000; padding: 12px 30px; font-size: 15px; font-weight: bold;" onclick="openRoleSelectionModal()">
+            🚀 Hemen Giriş Yap ve Başla
+        </button>
+    </div>
+
+    <!-- OYUN ALANI (Başlangıçta Gizli) -->
+    <div id="mainContainer" style="display: none; width: 100%; height: 100%;">
+        <div id="gameZone">
+            
+            <!-- Profil Giriş Paneli -->
+            <div id="profileDashboardModal" class="modal-overlay" style="display:none;">
+                <div class="dash-header">
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="menu-btn" style="border-color:#ff0055; color:#ff0055; padding: 10px 18px; font-size: 13px;" onclick="promptDoctorLogin()">🩺 Doktor Paneli</button>
+                        <h1 class="dash-title">🎮 Kim Oynuyor?</h1>
+                    </div>
+                    <div style="display:flex; gap: 8px;">
+                        <button class="menu-btn" style="border-color:#fdbb2d; color:#fdbb2d; padding: 10px 18px; font-size: 13px;" onclick="fetchFromCloud()">🔄 Yenile</button>
+                        <button class="menu-btn" style="border-color:#00ffcc; color:#00ffcc;" onclick="openAddProfileModal()">➕ Profil Ekle</button>
+                    </div>
+                </div>
+                <div class="profiles-container" id="profilesContainer">
+                    <div style="color: #a0a0c0; font-size: 14px; text-align: center; margin-top: 40px;">Veriler yükleniyor...</div>
+                </div>
+            </div>
+
+            <!-- Oyuna Giriş Lobisi (Kullanıcının kendi profil alanı ve puan rozeti) -->
+            <div id="entryScreenModal" class="modal-overlay" style="display: none; z-index: 190;">
+                <div class="popup-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 12px;">
+                        <div id="lobbyUserBadge" style="font-size: 12px; color: #00ffcc; background: rgba(0,255,204,0.1); padding: 5px 10px; border-radius: 15px; font-weight: bold;"></div>
+                        <div id="userScoreBadge" style="background: rgba(0,255,204,0.15); border: 1px solid #00ffcc; padding: 5px 10px; border-radius: 6px; font-weight: bold; color: #00ffcc; font-size: 12px; box-shadow: 0 0 8px rgba(0,255,204,0.2);">
+                            🏆 Puan: <span id="scoreVal">0</span>
+                        </div>
+                    </div>
+
+                    <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">🎮 Oyuna Hazır mısın?</h2>
+                    <p style="font-size: 13px; color: #a0a0c0; margin: 10px 0 15px 0;">Solunum egzersizine başlamak için hazırsın.</p>
+                    <button class="custom-btn" style="margin-top: 5px;" onclick="enterGameFromLobby()">▶️ Oyuna Gir</button>
+                    <div style="margin-top: 12px;">
+                        <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="backToProfilesFromLobby()">🚪 Profil Ekranına Dön</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Yeni Profil Ekleme Modalı -->
+            <div id="addProfileModal" class="modal-overlay" style="display: none;">
+                <div class="popup-card">
+                    <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">👤 Yeni Profil Oluştur</h2>
+                    <input type="text" id="newNameInput" class="input-field" placeholder="Adı" required>
+                    <input type="text" id="newSurnameInput" class="input-field" placeholder="Soyadı" required>
+                    <div style="margin: 12px 0; text-align: left;">
+                        <label style="font-size: 12px; color: #00ffcc; font-weight: bold; display: block; margin-bottom: 5px;">Karakterini / Kuşunu Seç:</label>
+                       <select id="newSkinSelect" class="input-field" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #00ffcc; border-radius: 6px;">
+                            <option value="skin-canarya">🟡 Sarı Kanarya</option>
+                            <option value="skin-roket">🔴 Kırmızı Kanarya</option>
+                            <option value="skin-alveol">🔵 Mavi Kanarya</option>
+                            <option value="skin-elmas">🟤 Kahverengi Kanarya</option>
+                        </select>
+                    </div>
+                    <input type="password" id="newPasswordInput" class="input-field" placeholder="Şifre (İsteğe bağlı)" autocomplete="new-password">
+                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                        <button class="menu-btn" style="border-color:#ff0055; color:#ff0055; padding: 10px 20px;" onclick="closeAddProfileModal()">Vazgeç</button>
+                        <button class="menu-btn" style="padding: 10px 20px;" onclick="createNewProfile()">Kaydet ve Ekle ✔️</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Doktor Paneli -->
+            <div id="doctorViewModal" class="modal-overlay" style="z-index: 300;">
+                <div class="doctor-container">
+                    <div class="doctor-header">
+                        <h2 style="color: #00ffcc; margin:0; font-size: 20px;">🩺 Doktor Klinik İzleme Merkezi</h2>
+                        <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="closeDoctorPanel()">Paneli Kapat ❌</button>
+                    </div>
+                    <div class="patient-list" id="patientListContainer"></div>
+                </div>
+            </div>
+
+            <!-- Biyomedikal Analiz Raporu & Regresyon Modeli -->
+            <div id="aiCoachModal" class="modal-overlay" style="display: none; justify-content: flex-end; align-items: flex-start; padding: 20px; background: rgba(10, 10, 15, 0.75);">
+                <div class="ai-card" style="width: 320px;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">🫁📈</div>
+                    <h2 style="color: #00ffcc; margin-top: 0; font-size: 16px;">Biyomedikal & Regresyon Analizi</h2>
+                    
+                    <div id="aiCoachContent" style="background: rgba(15,15,25,0.6); border: 1px solid #4e54c8; padding: 10px; border-radius: 8px; font-size: 12px; color: #e0e0e0; line-height: 1.4; margin: 8px 0; text-align: left;">
+                        Analiz ediliyor...
+                    </div>
+
+                    <!-- Lineer Regresyon Projeksiyon Kutusu -->
+                    <div style="background: rgba(0,255,204,0.05); border: 1px dashed #00ffcc; padding: 8px; border-radius: 6px; margin-bottom: 12px; text-align: left;">
+                        <div style="font-size: 11px; color: #00ffcc; font-weight: bold; margin-bottom: 4px;">📊 Lineer Regresyon Modeli (y = mx + b)</div>
+                        <div style="font-size: 11px; color: #a0a0c0;" id="regressionStatsTxt">
+                            Eğim (m): Hesaplanıyor...<br>
+                            Tahmini Sonraki Seans: --%
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <!-- BURADAKİ BUTON ARTIK DOĞRUDAN OYUN ÖNCESİ LOBİYE/KENDİ EKRANINA GÖNDERİYOR -->
+                        <button class="custom-btn" style="flex: 1; margin-top: 0; padding: 6px; font-size: 11px; background: #ff0055; color: #fff;" onclick="closeAiCoachToLobby()">Ana Menü 🚪</button>
+                        <button class="custom-btn" style="flex: 1; margin-top: 0; padding: 6px; font-size: 11px;" onclick="closeAiCoachAndShowChart()">Grafik 📈</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kalibrasyon Overlay -->
+            <div id="overlay" class="modal-overlay" style="display: none;">
+                <div class="popup-card">
+                    <div id="activeUserBadge" style="font-size: 12px; color: #00ffcc; background: rgba(0,255,204,0.1); padding: 5px 10px; border-radius: 15px; display: inline-block; margin-bottom: 10px; font-weight: bold;"></div>
+                    <h2 style="color: #00ffcc; margin-top:0; font-size: 20px;">🔬 Başlangıç Aşaması (Solunum Analizi)</h2>
+                    <p style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;">Vites kolunu yukarı kaldırarak ciğer performansınızı ölçün.</p>
+                    <p style="font-size: 12px; color: #ff0055; font-weight: bold; margin: 0;" id="alertTxt">⚠️ Lütfen önce kolu yukarı hareket ettirerek üfleme yapın!</p>
+                    <div style="display: flex; gap: 10px; margin: 15px 0;">
+                        <div style="flex: 1; font-size: 14px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">Anlık Kol: <span id="calibValTxt" style="color:#00ffcc; font-weight:bold;">%0</span></div>
+                        <div style="flex: 1; font-size: 14px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid #ff0055;">En Yüksek Güç: <span id="peakValTxt" style="color:#ff0055; font-weight:bold;">%0</span></div>
+                    </div>
+                    <button class="custom-btn" id="confirmBtn" onclick="showUpgradeScreen()" disabled>Seviyeyi Ölç ve Onayla</button>
+                </div>
+            </div>
+
+            <!-- Seviye Yükseltme Ekranı -->
+            <div id="upgradeScreen">
+                <h1 class="upgrade-title">GELİŞTİRME</h1>
+                <p class="upgrade-subtitle">Sütunlar ölçülen maksimum seviyenizin bir tık yukarısına taşınıyor!</p>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid #4e54c8; margin: 20px 0; width: 340px;">
+                    <div style="color: #a0a0c0; font-size: 14px;">Ölçülen Maksimum Güç: <span id="upgMeasured" style="color:#fff; font-weight:bold; font-size: 16px;">%0</span></div>
+                    <div style="color: #00ffcc; font-size: 18px; font-weight: bold; margin-top: 8px;">Taşınan Sütun Seviyesi (+5): <span id="upgTarget" style="color:#ff0055; font-size: 20px;">%5</span></div>
+                </div>
+                <button class="custom-btn" style="background: #00ffcc; color: #000; font-size: 16px; padding: 14px 28px;" onclick="startFirstStage()">1. AŞAMAYI BAŞLAT!</button>
+            </div>
+
+            <!-- Gelişim Grafiği Modalı -->
+            <div id="chartModal">
+                <div id="chartBox">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #4e54c8; padding-bottom:10px;">
+                        <span id="chartTitle" style="font-size: 14px; font-weight: bold; color: #00ffcc;">📈 SEANS CİĞER KAPASİTE GELİŞİM GRAFİĞİ</span>
+                        <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="toggleChart(false)">Kapat ❌</button>
+                    </div>
+                    <div class="graph-container" id="graphContainer"></div>
+                    <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                        <button class="menu-btn" style="border-color:#00ffcc; color:#00ffcc; padding: 10px 14px; font-size: 12px; white-space: nowrap;" onclick="openReportInNewTab()">📄 Raporu Sekmede Aç</button>
+                        <!-- GRAFİKTEKİ ÇIKIŞ BUTONU DA OYUN ÖNCESİ LOBİYE DÖNECEK ŞEKİLDE AYARLANDI -->
+                        <button class="menu-btn" style="border-color:#ff0055; color:#ff0055; padding: 10px 18px; font-size: 13px;" onclick="backToLobbyFromGame()">🚪 Lobiye Dön</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Oyun İçi UI Panelleri -->
+            <div id="scoreBoard" class="ui-board">Skor: 0 / 3</div>
+            <div id="levelBoard" class="ui-board">Aşama: Başlangıç (Sütunsuz)</div>
+            <div id="badgeDisplay" class="ui-board">🏆 Kazanılan Rozet: Yok</div>
+            
+            <div id="btnGroup">
+                <button class="menu-btn" style="border-color:#ff0055; color:#ff0055;" onclick="backToLobbyFromGame()">🚪 Çıkış / Lobiye Dön</button>
+            </div>
+            
+            <div id="clinicalPanel" class="ui-board">
+                <div style="color: #a0a0c0; font-size: 12px;">KLİNİK SENSÖR VERİLERİ</div>
+                <div style="margin-top:4px;">Anlık Değer (Kol): <span id="liveFlowTxt" style="color:#ff0055;">%0</span></div>
+                <div>Klinik Hedef (+5): <span id="targetFlowTxt" style="color:#00ffcc;">Ölçülüyor...</span></div>
+            </div>
+
+            <!-- Kuş ve Hedef Çizgisi -->
+            <div id="bird">
+                <div class="bird-parts">
+                    <div class="bird-beak"></div>
+                    <div class="bird-wing"></div>
+                </div>
+            </div>
+            <div id="targetLine"></div>
+
+            <!-- Dijital İkiz Simülasyon Alanı -->
+            <div id="lungTwinContainer" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column; background: rgba(15, 15, 25, 0.92); z-index: 15; border-radius: 12px;">
+                <h3 style="color: #00ffcc; font-family: sans-serif; margin-bottom: 10px; font-size: 16px;">🫁 Akciğer Dijital İkiz Simülasyonu</h3>
+                <svg id="digitalLung" width="220" height="220" viewBox="0 0 100 100" style="transition: transform 0.1s ease-out;">
+                    <path id="leftLung" d="M50 15 C30 5, 10 25, 15 55 C18 75, 40 82, 48 68 Z" fill="#00ffcc" opacity="0.85" stroke="#ffffff" stroke-width="1.5" />
+                    <path id="rightLung" d="M50 15 C70 5, 90 25, 85 55 C82 75, 60 82, 52 68 Z" fill="#00ffcc" opacity="0.85" stroke="#ffffff" stroke-width="1.5" />
+                </svg>
+                <div id="lungWarningText" style="color: #ff3366; font-family: sans-serif; font-weight: bold; margin-top: 15px; font-size: 14px;">Nefesini üfleyerek akciğeri genişlet!</div>
+            </div>
+
+        </div>
+
+        <!-- Sağ Vites / Kontrol Paneli -->
+        <div id="gearContainer">
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <button id="modeToggleBtn" onclick="toggleLungTwinMode()" style="width: 100%; background: rgba(0,0,0,0.8); color: #00ffcc; border: 2px solid #00ffcc; padding: 8px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 12px;">🫁 Dijital İkiz: KAPALI</button>
+                <div style="background: rgba(0, 255, 204, 0.15); border: 2px solid #00ffcc; padding: 10px; border-radius: 12px; text-align: center; margin-bottom: 10px;">
+    <span style="font-size: 16px;">🐥</span>
+    <div id="mascotText" style="font-size: 11px; color: #00ffcc; font-weight: bold; margin-top: 4px;">"Harika gidiyorsun kanka, hadi üfle!"</div>
+</div>
+
+            </div>
+            <div class="lever-label" style="margin-top: 5px;">🌬️ HAVA AKIŞ<br>VİTES KOLU</div>
+            <div class="slider-wrapper">
+                <input type="range" min="0" max="100" value="0" class="vertical-slider" id="leverSlider">
+            </div>
+            <div id="leverVal" style="font-size: 20px; font-weight: bold; color: #00ffcc;">%0</div>
+            
+            <div style="display: flex; gap: 4px; width: 100%; margin-top: 5px;">
+                <button onclick="setTheme('cyber')" style="flex:1; background:#1a2a6c; color:#00ffcc; border:1px solid #00ffcc; padding:6px 2px; font-size:10px; border-radius:4px; cursor:pointer;" title="Siber Mavi">🔵 Mavi</button>
+                <button onclick="setTheme('matrix')" style="flex:1; background:#0b3d16; color:#00ff66; border:1px solid #00ff66; padding:6px 2px; font-size:10px; border-radius:4px; cursor:pointer;" title="Matris Yeşil">🟢 Yeşil</button>
+                <button onclick="setTheme('sunset')" style="flex:1; background:#681f22; color:#ff9900; border:1px solid #ff5500; padding:6px 2px; font-size:10px; border-radius:4px; cursor:pointer;" title="Gün Batımı">🟠 Turuncu</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 2. BÖLÜM: PROJE VİZYONU -->
+<section id="visionSection" class="page-section landing-content-block">
+    <div class="content-card">
+        <h2>✨ Proje Vizyonu & Amaç</h2>
+        <p>Triflo, solunum rehabilitasyonunu monoton bir fiziksel egzersiz olmaktan çıkarıp, gamifiye (oyunlaştırılmış) bir klinik pediatrik deneyimine dönüştürür. Akıllı donanım entegrasyonu ve hassas vites akış algoritmalarıyla hastaların solunum kas hafızasını kalıcı olarak geliştirmeyi hedefler.</p>
+    </div>
+</section>
+
+<!-- 3. BÖLÜM: DONANIM VE LINEER TREND MODELİ -->
+<section id="techSection" class="page-section landing-content-block">
+    <div class="content-card">
+        <h2>⚙️ Donanım & Lineer Regresyon Modeli</h2>
+        <p>ESP32 mikrodenetleyicileri ve hassas optik sensörler ile entegre çalışabilen Triflo, her nefes üflemesini anlık olarak analiz eder. Arka planda çalışan <strong>Doğrusal Regresyon Tahmin Modeli</strong> ile geçmiş seanslarınızı analiz ederek gelecekteki performans projeksiyonunuzu matematiksel olarak hesaplar.</p>
+    </div>
+</section>
+
+<!-- 4. BÖLÜM: YORUMLAR & BAŞARI HİKAYELERİ -->
+<section id="reviewsSection" class="page-section landing-content-block">
+    <div class="content-card">
+        <h2>💬 Klinik Yorumlar ve Başarı Hikayeleri</h2>
+        <div class="review-grid">
+            <div class="review-box">
+                <p>“Solunum egzersizleri artık çocuklar için sıkıcı bir görev değil, rekabetçi ve keyifli bir oyun haline geldi!”</p>
+                <span class="review-author">- Uzman Fizyoterapist Değerlendirmesi</span>
+            </div>
+            <div class="review-box">
+                <p>“Seans grafiklerindeki istikrarlı artışı görmek motive olmamı sağlıyor. Müthiş bir biyomedikal inovasyon.”</p>
+                <span class="review-author">- Aktif Oyuncu / Hasta</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- JavaScript Bağlantıları -->
+<script src="input.js"></script>
+<script src="render.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="game.js"></script>
+<script>
+    // One-page akışı için kaydırma fonksiyonu
+    function scrollToSection(sectionId) {
+        let el = document.getElementById(sectionId);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    // Rol Seçim Modalını Aç / Kapat Fonksiyonları
+    function openRoleSelectionModal() {
+        let roleModal = document.getElementById('roleSelectModal');
+        if (roleModal) roleModal.style.display = 'flex';
+    }
+
+    function closeRoleSelectionModal() {
+        let roleModal = document.getElementById('roleSelectModal');
+        if (roleModal) roleModal.style.display = 'none';
+    }
+
+    // Rol Yönlendirme Mantığı
+    function selectSystemRole(role) {
+        closeRoleSelectionModal();
+        
+        if (role === 'patient') {
+            let welcomeBanner = document.getElementById('welcomeBanner');
+            let mainContainer = document.getElementById('mainContainer');
+            if (welcomeBanner) welcomeBanner.style.display = 'none';
+            if (mainContainer) mainContainer.style.display = 'flex';
+
+            let patientModal = document.getElementById('directLoginModal');
+            if (patientModal) patientModal.style.display = 'flex';
+        } else if (role === 'doctor') {
+            let docLoginModal = document.getElementById('doctorLoginModal');
+            if (docLoginModal) docLoginModal.style.display = 'flex';
+        }
+    }
+
+    // Oyun içinden Doktor Paneline geçiş için şifre sorma fonksiyonu
+    function promptDoctorLogin() {
+        let docLoginModal = document.getElementById('doctorLoginModal');
+        if (docLoginModal) docLoginModal.style.display = 'flex';
+    }
+
+    function closeDoctorLoginModal() {
+        let docLoginModal = document.getElementById('doctorLoginModal');
+        if (docLoginModal) docLoginModal.style.display = 'none';
+    }
+
+    // Doktor Şifre Doğrulama Mantığı
+    function verifyAndOpenDoctorPanel() {
+        let passInput = document.getElementById('doctorPasswordInput');
+        let enteredPass = passInput ? passInput.value : '';
+
+        if (enteredPass === '1234' || enteredPass === 'doktor123') {
+            closeDoctorLoginModal();
+
+            let welcomeBanner = document.getElementById('welcomeBanner');
+            let mainContainer = document.getElementById('mainContainer');
+            if (welcomeBanner) welcomeBanner.style.display = 'none';
+            if (mainContainer) mainContainer.style.display = 'flex';
+
+            let doctorModal = document.getElementById('doctorViewModal');
+            if (doctorModal) {
+                doctorModal.style.display = 'flex';
+                if (typeof renderDoctorPanel === 'function') {
+                    renderDoctorPanel();
+                }
+            }
+            if (passInput) passInput.value = '';
+        } else {
+            alert('⚠️ Hatalı Doktor Şifresi! Lütfen tekrar deneyin.');
+        }
+    }
+
+    // HATA ÇÖZÜMÜ: Hasta Girişinden Vazgeçildiğinde Ana Karşılama Ekranına Geri Dön
+    function closeDirectLoginModal() {
+        let m = document.getElementById('directLoginModal');
+        if (m) m.style.display = 'none';
+
+        let mainContainer = document.getElementById('mainContainer');
+        let welcomeBanner = document.getElementById('welcomeBanner');
+
+        if (mainContainer) mainContainer.style.display = 'none';
+        if (welcomeBanner) welcomeBanner.style.display = 'flex';
+
+        scrollToSection('heroSection');
+    }
+
+
+// LOBİYE DÖNÜŞ İÇİN DE AYNI KORUMAYI UYGULUYORUZ
+function backToLobbyFromGame() {
+    let activeKey = typeof currentUserKey !== 'undefined' ? currentUserKey : null;
+    
+    if (activeKey) {
+        let localData = JSON.parse(localStorage.getItem('triflo_local_hastalar')) || {};
+        
+        if (localData[activeKey]) {
+            let earned = Number(window.currentSessionEarnedPoints) || 0;
+            
+            if (earned > 0) {
+                let eskiPuan = Number(localData[activeKey].totalScore) || 0;
+                localData[activeKey].totalScore = eskiPuan + earned;
+                window.currentSessionEarnedPoints = 0;
+                
+                localStorage.setItem('triflo_local_hastalar', JSON.stringify(localData));
+                bulutProfilleri = localData;
+                
+                fetch(`https://triflo-game-default-rtdb.europe-west1.firebasedatabase.app/hastalar/${activeKey}/totalScore.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(localData[activeKey].totalScore)
+                }).catch(() => {});
+            }
+        }
+    }
+
+    const modalsToHide = [
+        'chartModal',
+        'aiCoachModal',
+        'overlay',
+        'upgradeScreen',
+        'lungTwinContainer'
+    ];
+
+    modalsToHide.forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    let entryModal = document.getElementById('entryScreenModal');
+    if (entryModal) entryModal.style.display = 'flex';
+
+    if (typeof updateAllScoreDisplays === 'function') {
+        updateAllScoreDisplays();
+    }
+
+    if (typeof resetGameState === 'function') {
+        resetGameState();
+    }
+}
+
+
+
+    // TAM ÇIKIŞ / ANA MENÜYE DÖNÜŞ (Giriş ekranına atar)
+    function logoutUser() {
+        scrollToSection('heroSection');
+
+        const allModals = [
+            'roleSelectModal', 
+            'directLoginModal', 
+            'doctorLoginModal',
+            'profileDashboardModal', 
+            'entryScreenModal', 
+            'addProfileModal', 
+            'doctorViewModal', 
+            'aiCoachModal', 
+            'overlay', 
+            'upgradeScreen', 
+            'chartModal',
+            'lungTwinContainer'
+        ];
+
+        allModals.forEach(id => {
+            let el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        let mainContainer = document.getElementById('mainContainer');
+        let welcomeBanner = document.getElementById('welcomeBanner');
+
+        if (mainContainer) mainContainer.style.display = 'none';
+        if (welcomeBanner) welcomeBanner.style.display = 'flex';
+
+        if (typeof resetGameState === 'function') {
+            resetGameState();
+        }
+    }
+</script>
+</body>
+</html>
